@@ -32,12 +32,11 @@ class HttpSut:
         code = int(response.status_code)
         headers = dict(response.headers)
         body = response.text
-        timestamp = datetime.now()
+        response_label = None
 
         if 'xml' in headers.get('content-type', ''):
             document = ElementTree.fromstring(body)
             hash = ElementTree.ElementTree(document).getroot().attrib
-            print(hash)
             response_label = Answer(code, json.dumps(headers), json.dumps(hash))
             # response_label = Labels.answer.instantiate({
             #     'code': code,
@@ -45,7 +44,7 @@ class HttpSut:
             #     'body': json.dumps(hash),
             # }, timestamp)
 
-            self.logger.info(f"Answer is an XML message: {hash}")
+            self.logger.info(f"Answer is an XML message: {response_label}")
         else:
             response_label = Answer(code, json.dumps(headers), body)
             # response_label = Labels.answer.instantiate({
@@ -54,7 +53,7 @@ class HttpSut:
             #     'body': body,
             # }, timestamp)
 
-            self.logger.info(f"Answer is a JSON message: {body}")
+            self.logger.info(f"Answer is a JSON message: {response_label}")
 
         physical_label = body
 

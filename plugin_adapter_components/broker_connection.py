@@ -77,7 +77,6 @@ class BrokerConnection:
     param [String] err
     """
     def on_error(self, ws, err):
-        print(err)
         self.logger.error("BrokerConnection", "Got a connection error: {}".format(str(err)))
         self.adapter_core.send_error(str(err))
 
@@ -121,6 +120,9 @@ class BrokerConnection:
     """
     def send_stimulus(self, pb_label, physical_label, timestamp, correlation_id):
         self.logger.debug("BrokerConnection", "Sending stimulus")
+        
+        print(pb_label)
+        print(physical_label)
 
         if physical_label:
             pb_label.physical_label = physical_label

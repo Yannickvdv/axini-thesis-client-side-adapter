@@ -1,5 +1,7 @@
 import sys
 import time
+import json
+from urllib.parse import urljoin
 # from .client_side.labels import client_response, client_stimulus
 from decimal import Decimal
 from datetime import date
@@ -41,11 +43,11 @@ class Handler:
     SUT SPECIFIC
 
     The SUT has produced a response which needs to be passed on to AMP.
-    param[[key, type, value]]
+    param[[channel, key, type, value]]
     """
     def response_received(self, response):
         self.logger.debug("Handler", "response received: {}".format(response))
-        self.adapter_core.send_response(self.response(response[0], response[1], response[2]),
+        self.adapter_core.send_response(self.response(response[0], response[1], response[2], response[3]),
             None, time.time_ns())
 
     """
@@ -87,18 +89,18 @@ class Handler:
     Generate a protobuf Stimulus Label.
     return [label_pb2.Label]
     """
-    def stimulus(self, label_name, parameters={}):
-        return self.generate_type_label(label_name, 0, parameters)
+    def stimulus(self, channel, label_name, parameters={}):
+        return self.generate_type_label(channel, label_name, 0, parameters)
 
     """
     Generate a protobuf Response Label.
     return [label_pb2.Label]
     """  
-    def response(self, label_name, parameters_type, parameters_value=None):
+    def response(self, channel, label_name, parameters_type, parameters_value=None):
         if parameters_value == None or parameters_value == {}:
-            return self.generate_type_label(label_name, 1, parameters_type)
+            return self.generate_type_label(channel, label_name, 1, parameters_type)
         else:
-            return self.generate_value_label(label_name, 1, parameters_type, parameters_value)
+            return self.generate_value_label(channel, label_name, 1, parameters_type, parameters_value)
 
     """
     SUT SPECIFIC
@@ -109,10 +111,18 @@ class Handler:
     def supported_labels(self):
         return [
                 # The client side stimuli
-                self.stimulus('c_landing_page_button_click'),
-
+                self.stimulus('client_side', 'landing_page_button_click', {'data': 'string'}),
+                
                 # The client side responses
-                self.response('c_landing_page_button_clicked', {}),
+                self.response('client_side', 'landing_page_button_clicked', {'data': 'string'}),
+
+
+                # The server side stimuli
+                self.stimulus('server_side', 'get', {'endpoint': 'string', 'path': 'string', 'headers': 'string'}),
+                self.stimulus('server_side', 'post', {'endpoint': 'string', 'path': 'string', 'headers': 'string', 'body': 'string'}),
+
+                # The server side responses
+                self.response('server_side', 'answer', {'code': 'integer', 'headers': 'string', 'body': 'string'}),
               ]
 
     """
@@ -126,21 +136,31 @@ class Handler:
     """
     def stimulate(self, label):
         physical_label = None
-        print(label)
 
-        # Assume all labels start with either c_ or s_:
-        # c = client side
-        # s = server side
-        label_id = label.label[:2]
-        label_name = label.label[2:]
-
-        if label_id == "c_":
-            if label_name == "landing_page_button_click":
+        if label.channel == "client_side":
+            if label.label == "landing_page_button_click":
                 self.client_side_sut.landing_page_button_click()
-        if label_id == "s_":
-            if label_name == "variable_saved":
-                # self.server_side_sut.
-                print("test")
+
+        elif label.channel == "server_side":
+            physical_label = label.label
+
+            endpoint = self.get_param_value('endpoint')
+            path = self.get_param_value('path')
+            headers = json.loads(self.get_param_value(label, 'headers'))
+
+            uri = urljoin(endpoint, path)
+
+            if label.label == "get":
+                self.server_side_sut.perform_get_request(headers, uri)
+
+            if label.label == "post":
+                body = self.get_param_value(label, 'body')
+                physical_label = body
+
+                self.server_side_sut.perform_post_request(body, headers, uri)
+        else: 
+            raise Exception(f"Unsupported stimulus {label.label!r}")
+
 
         return physical_label
     
@@ -153,7 +173,7 @@ class Handler:
     param [dict] parameters
     return [label_pb2.Label]
     """
-    def generate_type_label(self, label_name, label_type, parameters={}):
+    def generate_type_label(self, channel, label_name, label_type, parameters={}):
         pb_params = []
 
         # Create all the google protobuff Label:Paramater objects
@@ -165,7 +185,7 @@ class Handler:
 
         pb_label = label_pb2.Label(label=label_name,
                                    type=label_type,
-                                   channel="extern",
+                                   channel=channel,
                                    parameters=pb_params)
 
         pb_label.timestamp = time.time_ns()
@@ -177,13 +197,14 @@ class Handler:
     TODO ADD ARRAY AND HASH TYPES
 
     Generate a protobuf Label containing parameters with filled in values.
+    param [String] channel
     param [String] label_name
     param [label_pb2.Label.LabelType] label_type
     param [dict] parameters_type
     param [dict] parameters_value
     return [label_pb2.Label]
     """
-    def generate_value_label(self, label_name, label_type, parameters_type, parameters_value):
+    def generate_value_label(self, channel, label_name, label_type, parameters_type, parameters_value):
         pb_params = []
 
         # Create all the google protobuff Label:Paramater objects
@@ -214,7 +235,7 @@ class Handler:
 
         pb_label = label_pb2.Label(label=label_name,
                                    type=label_type,
-                                   channel="extern",
+                                   channel=channel,
                                    parameters=pb_params)
 
         pb_label.timestamp = time.time_ns()

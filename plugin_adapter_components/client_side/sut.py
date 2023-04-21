@@ -5,7 +5,7 @@ class SeleniumSut:
     """
     Constructor
     """
-    def __init__(self, logger,response_received):
+    def __init__(self, logger, response_received):
         self.logger = logger
         self.response_received = response_received
         self.landingPage = LandingPage()
@@ -34,9 +34,7 @@ class SeleniumSut:
     Run a specific test case 
     param tuple[] data
     """
-    def run_test_case(self, test, data = {}):
-        print(test)
-        
+    def run_test_case(self, test, data = {}):        
         suite = unittest.TestSuite()
         suite.addTest(test)
         # TODO: print to file instead as logs
@@ -53,7 +51,7 @@ class SeleniumSut:
         return result
 
     def landing_page_button_click(self):
-        response = [ "c_landing_page_button_clicked", { "data":"string" }, {"data": "test"} ]
+        response = ["client_side", "landing_page_button_clicked", { "data": "string" }, {"data": "test"} ]
         result = self.run_test_case(LandingPage("testButtonClick"))
         return self.handle_response(response)
         
