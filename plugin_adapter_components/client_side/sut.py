@@ -9,6 +9,7 @@ class SeleniumSut:
         self.logger = logger
         self.response_received = response_received
         self.landingPage = LandingPage()
+        self.channel = "client_side"
 
     """
     Special function: class name
@@ -51,7 +52,7 @@ class SeleniumSut:
         return result
 
     def landing_page_button_click(self):
-        response = ["client_side", "landing_page_button_clicked", { "data": "string" }, {"data": "test"} ]
+        response = [self.channel, "landing_page_button_clicked", { "data": "string" }, {"data": "test"} ]
         result = self.run_test_case(LandingPage("testButtonClick"))
         return self.handle_response(response)
         

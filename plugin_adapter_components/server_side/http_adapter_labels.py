@@ -42,6 +42,11 @@ class Answer:
       self.code = code
       self.headers = headers
       self.body = body
+
+  def getDir(self, channel):
+    return [channel, "answer", 
+            {"code": "integer", "headers": "string", "body": "string"}, 
+            {"code": self.code, "headers": self.headers, "body": self.body}]
       
 
 # class Labels:

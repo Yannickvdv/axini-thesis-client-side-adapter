@@ -121,9 +121,6 @@ class BrokerConnection:
     def send_stimulus(self, pb_label, physical_label, timestamp, correlation_id):
         self.logger.debug("BrokerConnection", "Sending stimulus")
         
-        print(pb_label)
-        print(physical_label)
-
         if physical_label:
             pb_label.physical_label = physical_label
 

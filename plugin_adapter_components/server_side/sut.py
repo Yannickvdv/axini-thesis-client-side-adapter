@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 from xml.etree import ElementTree
 from .http_adapter_labels import Get, Post, Answer
+import requests
 
 class HttpSut:
     """
@@ -10,6 +11,7 @@ class HttpSut:
     def __init__(self, logger, response_received):
         self.logger = logger
         self.response_received = response_received
+        self.channel = "server_side"
 
     """
     Special function: class name
@@ -37,33 +39,21 @@ class HttpSut:
         if 'xml' in headers.get('content-type', ''):
             document = ElementTree.fromstring(body)
             hash = ElementTree.ElementTree(document).getroot().attrib
-            response_label = Answer(code, json.dumps(headers), json.dumps(hash))
-            # response_label = Labels.answer.instantiate({
-            #     'code': code,
-            #     'headers': json.dumps(headers),
-            #     'body': json.dumps(hash),
-            # }, timestamp)
+            response_label = Answer(code, json.dumps(headers), json.dumps(hash)).getDir(self.channel)
 
-            self.logger.info(f"Answer is an XML message: {response_label}")
+            self.logger.info("Sut", f"Answer is an XML message: {response_label}")
         else:
-            response_label = Answer(code, json.dumps(headers), body)
-            # response_label = Labels.answer.instantiate({
-            #     'code': code,
-            #     'headers': json.dumps(headers),
-            #     'body': body,
-            # }, timestamp)
+            response_label = Answer(code, json.dumps(headers), body).getDir(self.channel)
 
-            self.logger.info(f"Answer is a JSON message: {response_label}")
-
-        physical_label = body
-
-        self.response_received(response)
+            self.logger.info("Sut", f"Answer is a JSON message: {response_label}")
+        
+        self.response_received(response_label)
 
     def perform_post_request(self, body, headers, uri):
-        self.logger.info(f"POST request for endpoint: {uri}")
+        self.logger.info("Sut", f"POST request for endpoint: {uri}")
         try:
-            response = self.requests.post(uri, data=body, headers=headers)
-            self.logger.info(f"POST answer for endpoint: {uri}")
+            response = requests.post(url=uri, data=body, headers=headers)
+            self.logger.info("Sut", f"POST answer for endpoint: {uri}")
             self.handle_response(response)
         except Exception as e:
             # TODO: handle error
@@ -71,11 +61,11 @@ class HttpSut:
             # self.adapter_core.send_error(str(e))
 
     def perform_get_request(self, headers, uri):
-        self.logger.info(f"GET request for endpoint: {uri}")
+        self.logger.info("Sut", f"GET request for endpoint: {uri}")
 
         try:
-            response = self.requests.get(uri, headers=headers)
-            self.logger.info(f"GET answer for endpoint: {uri}")
+            response = requests.get(uri, headers=headers)
+            self.logger.info("Sut", "GET answer for endpoint: {uri}")
             self.handle_response(response)
         except Exception as e:
             # TODO: handle error

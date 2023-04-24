@@ -142,10 +142,8 @@ class Handler:
                 self.client_side_sut.landing_page_button_click()
 
         elif label.channel == "server_side":
-            physical_label = label.label
-
-            endpoint = self.get_param_value('endpoint')
-            path = self.get_param_value('path')
+            endpoint = self.get_param_value(label, 'endpoint')
+            path = self.get_param_value(label, 'path')
             headers = json.loads(self.get_param_value(label, 'headers'))
 
             uri = urljoin(endpoint, path)
@@ -155,7 +153,7 @@ class Handler:
 
             if label.label == "post":
                 body = self.get_param_value(label, 'body')
-                physical_label = body
+                # physical_label = body
 
                 self.server_side_sut.perform_post_request(body, headers, uri)
         else: 
