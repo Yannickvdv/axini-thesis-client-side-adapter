@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from xml.etree import ElementTree
-from .http_adapter_labels import Get, Post, Answer
+from .labels import Get, Post, Answer
 import requests
 
 class HttpSut:
