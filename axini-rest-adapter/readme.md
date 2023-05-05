@@ -1,0 +1,32 @@
+# AMP adapter for Selenium
+
+This repository contains an Axini Modeling Platform adapter that simulates being a REST API to allow for modelling of the communication to a REST API.
+
+## Architecture
+
+The general architecture is as follows:
+![adapter architecture](./plugin_adapter_architecture.png)
+
+## Setup
+
+Create a [virtual environment](https://docs.python.org/3/library/venv.html), activate it, and install the requirements.txt:
+
+```bash
+python3 -m venv env
+.\env\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+## Run
+
+To start the Python adapter; go to the folder python_adapter in your terminal and run *"sudo python3 plugin_adapter.py --channel \<channel> --name \<name> --url \<websocket> --log_level \<loglevel> --token \<token>"* where:
+
+- \<name> is the of your machine, e.g. dev-vm
+- \<channel> is the channel.
+- \<loglevel> is the level of the logger shown in the terminal, either 1 (error), 2 (warning), 4 (into) or 8 (debugging).
+- \<token> is the token generated on the Adapter page within the AMP GUI.
+- \<websocket> the websocket address for the adapter (ws(s)://..) can be found on the same page.
+
+## Example
+
+python3 plugin_adapter.py --channel server_side --name rest --url "wss://research01.axini.com:443/adapters" --log_level 4 --token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2ODk0OTk5OTMsInN1YiI6Inlhbm5pY2sudmFuLmRlci52bGV1dGVuQHN0dWRlbnQudXZhLm5sIiwiaXNzIjoidm1wdWJsaWNwcm9kMDEiLCJzY29wZSI6ImFkYXB0ZXIifQ.Tsrr0qtvVK5shwFzxMgQsndNg_oSXLE22ZV6nOA0adA

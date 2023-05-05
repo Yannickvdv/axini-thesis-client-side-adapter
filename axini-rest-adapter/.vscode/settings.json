@@ -1,0 +1,19 @@
+{
+    "search.exclude": {
+        "./venv": true
+    },
+    "terminal.integrated.env.linux": {
+        "GTK_PATH": ""
+    },
+    "protoc": {
+        "options": [
+            "--proto_path=${workspaceRoot}/api",
+        ]
+    },
+    "python.linting.flake8Enabled": true,
+    "python.linting.enabled": false,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.extraPaths": [
+        "./api"
+    ]
+}
