@@ -1,12 +1,9 @@
 import sys
 import time
-import json
-from urllib.parse import urljoin
-# from .client_side.labels import client_response, client_stimulus
+import threading
 from decimal import Decimal
 from datetime import date
-from .client_side.sut import SeleniumSut
-from .server_side.sut import HttpSut
+from .sut_connection import SeleniumInterface
 
 sys.path.insert(0, './api')
 import label_pb2
@@ -21,16 +18,18 @@ method should be called
 
 
 class Handler:
-    def __init__(self, logger):
+    def __init__(self, logger, channel):
         self.adapter_core = None  # callback to adapter; register separately
         self.configuration = []
 
         # Initialize empty SUT connections
-        self.client_side_sut = None
-        self.server_side_sut = None
+        self.sut_connection = None
 
         # Initialize logger
         self.logger = logger
+
+        self.channel = channel
+
 
     """
     Set the adapter core object reference.
@@ -39,16 +38,29 @@ class Handler:
     def register_adapter_core(self, adapter_core):
         self.adapter_core = adapter_core
 
+
     """
     SUT SPECIFIC
 
     The SUT has produced a response which needs to be passed on to AMP.
     param[[channel, key, type, value]]
     """
-    def response_received(self, response):
+    def send_respone(self, response):
         self.logger.debug("Handler", "response received: {}".format(response))
         self.adapter_core.send_response(self.response(response[0], response[1], response[2], response[3]),
             None, time.time_ns())
+        
+    # """
+    # SUT SPECIFIC
+
+    # The SUT has produced a response which needs to be passed on to AMP.
+    # param[[channel, key, type, value]]
+    # """
+    # def stimulus_received(self, response):
+    #     self.logger.debug("Handler", "response received: {}".format(response))
+    #     self.adapter_core.send_response(self.response(response[0], response[1], response[2], response[3]),
+    #         None, time.time_ns())
+
 
     """
     SUT SPECIFIC
@@ -56,8 +68,8 @@ class Handler:
     Prepare the SUT to start testing.
     """
     def start(self):
-        self.server_side_sut = HttpSut(self.logger, self.response_received)
-        self.client_side_sut = SeleniumSut(self.logger, self.response_received)
+        self.sut_connection = SeleniumInterface(self.logger, self.send_respone)
+
 
     """
     SUT SPECIFIC
@@ -77,30 +89,30 @@ class Handler:
     def stop(self):
         self.logger.info("Handler", "Stopping the plugin adapter from plugin handler")
 
-        self.client_side_sut.stop()
-        self.client_side_sut = None
-
-        self.server_side_sut.stop()
-        self.server_side_sut = None
+        self.sut_connection.stop()
+        self.sut_connection = None
 
         self.logger.debug("Handler", "Finished stopping the plugin adapter from plugin handler")
+
 
     """
     Generate a protobuf Stimulus Label.
     return [label_pb2.Label]
     """
-    def stimulus(self, channel, label_name, parameters={}):
-        return self.generate_type_label(channel, label_name, 0, parameters)
+    def stimulus(self, label_name, parameters={}):
+        return self.generate_type_label(label_name, 0, parameters)
+
 
     """
     Generate a protobuf Response Label.
     return [label_pb2.Label]
     """  
-    def response(self, channel, label_name, parameters_type, parameters_value=None):
+    def response(self, label_name, parameters_type, parameters_value=None):
         if parameters_value == None or parameters_value == {}:
-            return self.generate_type_label(channel, label_name, 1, parameters_type)
+            return self.generate_type_label(label_name, 1, parameters_type)
         else:
-            return self.generate_value_label(channel, label_name, 1, parameters_type, parameters_value)
+            return self.generate_value_label(label_name, 1, parameters_type, parameters_value)
+
 
     """
     SUT SPECIFIC
@@ -110,21 +122,15 @@ class Handler:
     """
     def supported_labels(self):
         return [
-                # The client side stimuli
-                self.stimulus('client_side', 'landing_page_button_click', {'data': 'string'}),
-                
-                # The client side responses
-                self.response('client_side', 'landing_page_button_clicked', {'data': 'string'}),
+                self.stimulus('click', {'css_selector': 'string'}),
+                self.stimulus('visit', {'_url': 'string'}),
+                self.stimulus('fill_in', {'css_selector': 'string', 'value': 'string'}),
 
-
-                # The server side stimuli
-                self.stimulus('server_side', 'get', {'endpoint': 'string', 'path': 'string', 'headers': 'string'}),
-                self.stimulus('server_side', 'post', {'endpoint': 'string', 'path': 'string', 'headers': 'string', 'body': 'string'}),
-
-                # The server side responses
-                self.response('server_side', 'answer', {'code': 'integer', 'headers': 'string', 'body': 'string'}),
-              ]
-
+                self.response('get_url', {'_url': 'string'}),
+                self.response('get_value', {'value': 'string'})
+        ]
+    
+    
     """
     SUT SPECIFIC
 
@@ -136,32 +142,30 @@ class Handler:
     """
     def stimulate(self, label):
         physical_label = None
-
-        if label.channel == "client_side":
-            if label.label == "landing_page_button_click":
-                self.client_side_sut.landing_page_button_click()
-
-        elif label.channel == "server_side":
-            endpoint = self.get_param_value(label, 'endpoint')
-            path = self.get_param_value(label, 'path')
-            headers = json.loads(self.get_param_value(label, 'headers'))
-
-            uri = urljoin(endpoint, path)
-
-            if label.label == "get":
-                self.server_side_sut.perform_get_request(headers, uri)
-
-            if label.label == "post":
-                body = self.get_param_value(label, 'body')
-                # physical_label = body
-
-                self.server_side_sut.perform_post_request(body, headers, uri)
-        else: 
-            raise Exception(f"Unsupported stimulus {label.label!r}")
-
+        
+        new_thread = threading.Thread(target=self.threaded_simulate, args=label)
+        new_thread.start()
 
         return physical_label
     
+
+    def threaded_simulate(self, label):
+        label_name = label.label
+
+        if label_name == 'click':
+            self.sut_connection.click(label.parameters[0].value.string)
+
+        elif label_name == 'visit':
+            self.sut_connection.visit(label.parameters[0].value.string)
+            self.sut_connection.get_url()
+
+        elif label_name == 'fill_in':
+            self.sut_connection.fill_in(label.parameters[0].value.string, label.parameters[1].value.string)
+            self.sut_connection.get_value(label.parameters[0].value.string)
+        else: 
+            raise Exception(f"Unsupported stimulus {label.label!r}")
+    
+
     """
     TODO ADD ARRAY AND HASH TYPES
 
@@ -171,7 +175,7 @@ class Handler:
     param [dict] parameters
     return [label_pb2.Label]
     """
-    def generate_type_label(self, channel, label_name, label_type, parameters={}):
+    def generate_type_label(self, label_name, label_type, parameters={}):
         pb_params = []
 
         # Create all the google protobuff Label:Paramater objects
@@ -183,7 +187,7 @@ class Handler:
 
         pb_label = label_pb2.Label(label=label_name,
                                    type=label_type,
-                                   channel=channel,
+                                   channel=self.channel,
                                    parameters=pb_params)
 
         pb_label.timestamp = time.time_ns()
@@ -202,7 +206,7 @@ class Handler:
     param [dict] parameters_value
     return [label_pb2.Label]
     """
-    def generate_value_label(self, channel, label_name, label_type, parameters_type, parameters_value):
+    def generate_value_label(self, label_name, label_type, parameters_type, parameters_value):
         pb_params = []
 
         # Create all the google protobuff Label:Paramater objects
@@ -233,7 +237,7 @@ class Handler:
 
         pb_label = label_pb2.Label(label=label_name,
                                    type=label_type,
-                                   channel=channel,
+                                   channel=self.channel,
                                    parameters=pb_params)
 
         pb_label.timestamp = time.time_ns()
