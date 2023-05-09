@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "system-under-test"
+		},
+		{
+			"path": "selenium-adapter"
+		},
+		{
+			"path": "rest-adapter"
+		}
+	],
+	"settings": {}
+}
