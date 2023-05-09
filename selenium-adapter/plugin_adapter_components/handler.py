@@ -1,9 +1,10 @@
 import sys
 import time
-import threading
 from decimal import Decimal
 from datetime import date
 from .sut_connection import SeleniumInterface
+from .adapter_core import AdapterCore
+import traceback
 
 sys.path.insert(0, './api')
 import label_pb2
@@ -19,15 +20,14 @@ method should be called
 
 class Handler:
     def __init__(self, logger, channel):
-        self.adapter_core = None  # callback to adapter; register separately
+        self.adapter_core: AdapterCore | None = None # callback to adapter; register separately
         self.configuration = []
 
         # Initialize empty SUT connections
-        self.sut_connection = None
+        self.sut_connection: SeleniumInterface | None = None
 
         # Initialize logger
         self.logger = logger
-
         self.channel = channel
 
 
@@ -45,22 +45,12 @@ class Handler:
     The SUT has produced a response which needs to be passed on to AMP.
     param[[channel, key, type, value]]
     """
-    def send_respone(self, response):
-        self.logger.debug("Handler", "response received: {}".format(response))
-        self.adapter_core.send_response(self.response(response[0], response[1], response[2], response[3]),
+    def send_respone(self, label_name, parameters_type={}, parameters_value={}):
+        self.logger.debug("Handler", "response received: {}".format(label_name))
+        if self.adapter_core:
+            self.adapter_core.send_response(self.response(label_name, parameters_type, parameters_value),
             None, time.time_ns())
         
-    # """
-    # SUT SPECIFIC
-
-    # The SUT has produced a response which needs to be passed on to AMP.
-    # param[[channel, key, type, value]]
-    # """
-    # def stimulus_received(self, response):
-    #     self.logger.debug("Handler", "response received: {}".format(response))
-    #     self.adapter_core.send_response(self.response(response[0], response[1], response[2], response[3]),
-    #         None, time.time_ns())
-
 
     """
     SUT SPECIFIC
@@ -69,6 +59,7 @@ class Handler:
     """
     def start(self):
         self.sut_connection = SeleniumInterface(self.logger, self.send_respone)
+        self.sut_connection.start()
 
 
     """
@@ -89,8 +80,11 @@ class Handler:
     def stop(self):
         self.logger.info("Handler", "Stopping the plugin adapter from plugin handler")
 
-        self.sut_connection.stop()
-        self.sut_connection = None
+        if self.sut_connection:
+            self.sut_connection.stop()
+            self.sut_connection = None
+        else:
+            self.logger.debug("Handler", "Sut connection has not yet been initialized")
 
         self.logger.debug("Handler", "Finished stopping the plugin adapter from plugin handler")
 
@@ -107,8 +101,8 @@ class Handler:
     Generate a protobuf Response Label.
     return [label_pb2.Label]
     """  
-    def response(self, label_name, parameters_type, parameters_value=None):
-        if parameters_value == None or parameters_value == {}:
+    def response(self, label_name, parameters_type={}, parameters_value={}):
+        if parameters_value == {}:
             return self.generate_type_label(label_name, 1, parameters_type)
         else:
             return self.generate_value_label(label_name, 1, parameters_type, parameters_value)
@@ -125,6 +119,7 @@ class Handler:
                 self.stimulus('click', {'css_selector': 'string'}),
                 self.stimulus('visit', {'_url': 'string'}),
                 self.stimulus('fill_in', {'css_selector': 'string', 'value': 'string'}),
+                self.stimulus('check_inventory'), 
 
                 self.response('get_url', {'_url': 'string'}),
                 self.response('get_value', {'value': 'string'})
@@ -142,28 +137,37 @@ class Handler:
     """
     def stimulate(self, label):
         physical_label = None
-        
-        new_thread = threading.Thread(target=self.threaded_simulate, args=label)
-        new_thread.start()
-
-        return physical_label
-    
-
-    def threaded_simulate(self, label):
         label_name = label.label
 
-        if label_name == 'click':
-            self.sut_connection.click(label.parameters[0].value.string)
+        # TODO: Implement threading        
+        # new_thread = threading.Thread(target=self.threaded_simulate, args=(label,))
+        # new_thread.start()
 
-        elif label_name == 'visit':
-            self.sut_connection.visit(label.parameters[0].value.string)
-            self.sut_connection.get_url()
+        try:
+            if self.sut_connection:
+                if label_name == 'click':
+                    self.sut_connection.click(self.get_param_value(label, 'css_selector'))
 
-        elif label_name == 'fill_in':
-            self.sut_connection.fill_in(label.parameters[0].value.string, label.parameters[1].value.string)
-            self.sut_connection.get_value(label.parameters[0].value.string)
-        else: 
-            raise Exception(f"Unsupported stimulus {label.label!r}")
+                elif label_name == 'visit':
+                    self.sut_connection.visit(self.get_param_value(label, '_url'))
+                    # self.sut_connection.get_url()
+
+                elif label_name == 'fill_in':
+                    self.sut_connection.fill_in(
+                        self.get_param_value(label, 'css_selector'), 
+                        self.get_param_value(label, 'value'))
+                    self.sut_connection.get_value(
+                        self.get_param_value(label, 'value'))
+
+                elif label_name == 'check_inventory':
+                    print("checking inventory i guess")
+
+                else: 
+                    raise Exception(f"Unsupported stimulus {label.label!r}")
+        except:
+            print(traceback.format_exc())
+
+        return physical_label
     
 
     """
@@ -312,8 +316,14 @@ class Handler:
                     return param.value.hash_value
                 else:
                     message = "Received an unknown label type"
-                    self.broker_connection.close(reason=message)
+                    if self.adapter_core:
+                        self.adapter_core.send_error(message)
+          
+                    self.logger.debug("Handler", message)
                     return 0
 
         message = "Could not find param " + param_name + " in label " + label
-        self.broker_connection.close(reason=message)
+        if self.adapter_core:
+                self.adapter_core.send_error(message)
+
+        self.logger.debug("Handler", message)

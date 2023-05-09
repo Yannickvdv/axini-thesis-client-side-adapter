@@ -36,22 +36,26 @@ class SeleniumInterface:
     """
     def start(self):
         self.browser = Browser('firefox')
-        self.browser.visit("https://academybugs.com/find-bugs/")
-        WebDriverWait(self.browser.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'body.loaded')))
-        self.logger.info("Sut", "")
+        self.logger.info("Sut", "Started Selenium browser")
+
 
     """
     Prepares the SUT for a new test case.
     """
     def reset(self):
-        self.logger.info("Sut", "")
+        self.logger.info("Sut", "Resetting Selenium browser started")
+        self.stop()
+        self.start()
+        self.logger.info("Sut", "Resetting Selenium browser completed")
 
 
     """
     Perform any cleanup if the selenium has stopped
     """
     def stop(self):
-        self.logger.info("Sut", "Http requests to the server have been stopped")
+        if self.browser:
+            self.browser.quit()
+        self.logger.info("Sut", "Stopped Selenium browser")
 
 
     """

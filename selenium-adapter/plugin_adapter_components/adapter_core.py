@@ -90,6 +90,7 @@ class AdapterCore():
     """
     def label_received(self, label, correlation_id):
         if self.state_machine.is_ready():
+            physical_label = None
             # Check if type label_pb2.Label.LabelType.STIMULUS
             if label.type != 0:
                 message = "Label is not a stimulus"
