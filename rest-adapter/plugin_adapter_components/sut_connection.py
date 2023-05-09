@@ -1,5 +1,10 @@
-from flask import Flask
-app = Flask(__name__)
+import time
+from flask import Flask, request
+import threading
+from queue import Queue
+
+# responses should be a tuple of status and body
+json_response_queue: Queue[tuple[int, str]] = Queue()
 
 class RestInterface:
 
@@ -10,7 +15,29 @@ class RestInterface:
         self.logger = logger
         self.response_received = response_received
         self.browser = None
+        self.flask_thread = None
 
+        self.app = Flask(__name__)
+
+        @self.app.route('/', defaults={'path': ''})
+        @self.app.route('/<path:path>')
+        def catch_all(path):
+            # get the request method and headers
+            req_method = request.method
+            req_headers = request.headers
+
+            # TODO: parse the request to see if it is checking inventory 
+            self.handle_response("check_inventory")
+
+            # Wait for the 
+            response = json_response_queue.get(timeout=5)
+            print(response)
+            return self.app.response_class(
+                status=response[0],
+                response=response[1],
+            )            
+            # return a string with the requested path, method, and headers
+            return f"You want path: {path}\nRequest method: {req_method}\nRequest headers: {req_headers}\n"
 
     """
     Special function: class name
@@ -18,26 +45,37 @@ class RestInterface:
     def __name__(self):
         return "Sut"
 
-
+   
     """
     Connects to the SUT and prepares it for testing.
     """
     def start(self):
-        self.logger.info("Sut", "")
-        app.run(debug=True)
+        self.logger.info("Sut", "Starting the flask endpoint")
+        self.flask_thread = threading.Thread(target=self.start_flask_app)
+        self.flask_thread.setDaemon(True)
+        self.flask_thread.start()
 
+
+    def start_flask_app(self):
+        self.app.run()
 
     """
     Prepares the SUT for a new test case.
     """
     def reset(self):
-        self.logger.info("Sut", "")
+        self.logger.info("Sut", "Resetting Selenium browser started")
+        self.stop()
+        self.start()
+        self.logger.info("Sut", "Resetting Selenium browser completed")
+
 
 
     """
     Perform any cleanup if the selenium has stopped
     """
     def stop(self):
+        # if self.flask_thread: 
+        #     self.flask_thread.join()
         self.logger.info("Sut", "The REST API has been spun down")
 
 
@@ -50,8 +88,6 @@ class RestInterface:
         self.response_received(response)
 
 
-    @app.route('/', defaults={'path': ''})
-    @app.route('/<path:path>')
-    def catch_all(path, request):
-        print(request)
-        return 'You want path: %s' % path
+    def add_http_response_to_queue(self, status_code, body={}):
+        json_response_queue.put((status_code, body))
+        

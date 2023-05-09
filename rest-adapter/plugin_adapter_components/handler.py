@@ -6,7 +6,6 @@ from datetime import date
 from .sut_connection import RestInterface
 from .adapter_core import AdapterCore
 
-
 sys.path.insert(0, './api')
 import label_pb2
 
@@ -20,15 +19,16 @@ method should be called
 
 
 class Handler:
-    def __init__(self, logger):
-        self.adapter_core: AdapterCore | None # callback to adapter; register separately
+    def __init__(self, logger, channel):
+        self.adapter_core: AdapterCore | None = None # callback to adapter; register separately
         self.configuration = []
 
         # Initialize empty SUT connections
-        self.sut_connection: RestInterface | None
+        self.sut_connection: RestInterface | None = None
 
         # Initialize logger
         self.logger = logger
+        self.channel = channel
 
 
     """
@@ -45,23 +45,11 @@ class Handler:
     The SUT has produced a response which needs to be passed on to AMP.
     param[[channel, key, type, value]]
     """
-    def send_respone(self, response):
-        self.logger.debug("Handler", "response received: {}".format(response))
+    def send_respone(self, label_name, parameters_type={}, parameters_value={}):
+        self.logger.debug("Handler", "response received: {}".format(label_name))
         if self.adapter_core:
-            self.adapter_core.send_response(self.response(response[0], response[1], response[2]),
+            self.adapter_core.send_response(self.response(label_name, parameters_type, parameters_value),
             None, time.time_ns())
-        
-    # """
-    # SUT SPECIFIC
-
-    # The SUT has produced a response which needs to be passed on to AMP.
-    # param[[channel, key, type, value]]
-    # """
-    # def stimulus_received(self, response):
-    #     self.logger.debug("Handler", "response received: {}".format(response))
-    #     self.adapter_core.send_response(self.response(response[0], response[1], response[2], response[3]),
-    #         None, time.time_ns())
-
 
     """
     SUT SPECIFIC
@@ -70,6 +58,7 @@ class Handler:
     """
     def start(self):
         self.sut_connection = RestInterface(self.logger, self.send_respone)
+        self.sut_connection.start()
 
 
     """
@@ -111,8 +100,8 @@ class Handler:
     Generate a protobuf Response Label.
     return [label_pb2.Label]
     """  
-    def response(self, label_name, parameters_type, parameters_value=None):
-        if parameters_value == None or parameters_value == {}:
+    def response(self, label_name, parameters_type={}, parameters_value={}):
+        if parameters_value == {}:
             return self.generate_type_label(label_name, 1, parameters_type)
         else:
             return self.generate_value_label(label_name, 1, parameters_type, parameters_value)
@@ -126,10 +115,9 @@ class Handler:
     """
     def supported_labels(self):
         return [
-                self.stimulus('check_inventory'),
 
-                self.response('not_found', {'amount': 'string'}),
-                self.response('found', {'amount': 'string'}),
+                self.stimulus('not_found', {'status': 'integer'}),
+                self.stimulus('found', {'status': 'integer', 'body': 'string'}),
         ]
     
     
@@ -144,21 +132,27 @@ class Handler:
     """
     def stimulate(self, label):
         physical_label = None
-        
-        new_thread = threading.Thread(target=self.threaded_simulate, args=label)
-        new_thread.start()
-
-        return physical_label
-    
-
-    def threaded_simulate(self, label):
         label_name = label.label
 
+        # TODO: Implement threading        
+        # new_thread = threading.Thread(target=self.threaded_simulate, args=(label,))
+        # new_thread.start()
+
         if self.sut_connection:
-            if label_name == '':
-                print('label')
+            if label_name == 'found':
+                self.sut_connection.add_http_response_to_queue(
+                    self.get_param_value(label, 'status'),
+                    self.get_param_value(label, 'body'))
+
+            elif label_name == 'not_found':
+                self.sut_connection.add_http_response_to_queue(
+                    self.get_param_value(label, 'status'))
+
             else: 
                 raise Exception(f"Unsupported stimulus {label.label!r}")
+   
+
+        return physical_label
     
 
     """
@@ -182,11 +176,10 @@ class Handler:
 
         pb_label = label_pb2.Label(label=label_name,
                                    type=label_type,
-                                   channel="client-side",
+                                   channel=self.channel,
                                    parameters=pb_params)
 
         pb_label.timestamp = time.time_ns()
-        
 
         return pb_label
 
@@ -233,7 +226,7 @@ class Handler:
 
         pb_label = label_pb2.Label(label=label_name,
                                    type=label_type,
-                                   channel="client-side",
+                                   channel=self.channel,
                                    parameters=pb_params)
 
         pb_label.timestamp = time.time_ns()
