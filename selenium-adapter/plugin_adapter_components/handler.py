@@ -117,12 +117,13 @@ class Handler:
     def supported_labels(self):
         return [
                 self.stimulus('click', {'css_selector': 'string'}),
-                self.stimulus('visit', {'_url': 'string'}),
+                self.stimulus('open_url', {'url': 'string'}),
                 self.stimulus('fill_in', {'css_selector': 'string', 'value': 'string'}),
-                self.stimulus('check_inventory'), 
 
-                self.response('get_url', {'_url': 'string'}),
-                self.response('get_value', {'value': 'string'})
+                self.response('url_opened', {'url': 'string'}),
+                self.response('get_value', {'value': 'string'}),
+                self.response('show_error'),
+                self.response('show_success')
         ]
     
     
@@ -139,18 +140,13 @@ class Handler:
         physical_label = None
         label_name = label.label
 
-        # TODO: Implement threading        
-        # new_thread = threading.Thread(target=self.threaded_simulate, args=(label,))
-        # new_thread.start()
-
         try:
             if self.sut_connection:
                 if label_name == 'click':
                     self.sut_connection.click(self.get_param_value(label, 'css_selector'))
 
-                elif label_name == 'visit':
-                    self.sut_connection.visit(self.get_param_value(label, '_url'))
-                    # self.sut_connection.get_url()
+                elif label_name == 'open_url':
+                    self.sut_connection.visit(self.get_param_value(label, 'url'))
 
                 elif label_name == 'fill_in':
                     self.sut_connection.fill_in(
@@ -158,9 +154,6 @@ class Handler:
                         self.get_param_value(label, 'value'))
                     self.sut_connection.get_value(
                         self.get_param_value(label, 'value'))
-
-                elif label_name == 'check_inventory':
-                    print("checking inventory i guess")
 
                 else: 
                     raise Exception(f"Unsupported stimulus {label.label!r}")

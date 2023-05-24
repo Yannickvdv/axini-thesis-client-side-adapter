@@ -62,9 +62,9 @@ class SeleniumInterface:
     Parse the SUT's response and add it to the response stack from the
     Handler class.
     """
-    def handle_response(self, response):
+    def handle_response(self, response=None):
         self.logger.debug("Sut", "Add response: {}".format(response))
-        self.response_received(response)
+        self.response_received(response[0], response[1], response[2])
 
 
     def click(self, css_selector):
@@ -93,11 +93,12 @@ class SeleniumInterface:
 
     def visit(self, url):
         self.browser.visit(url)
-        time.sleep(2)
+        self.get_url()
 
 
     def get_url(self):
-        response = ["get_url", {"_url" : "string"}, {"_url": self.browser.url}]
+        response = ["url_opened", {"url" : "string"}, {"url": self.browser.url}]
+        print(self.browser.url)
         return self.handle_response(response)
 
 
@@ -110,3 +111,11 @@ class SeleniumInterface:
     def fill_in(self, css_selector, value):
         self.browser.find_by_css(css_selector).fill(value)
         time.sleep(2)
+
+    def show_success(self):
+        self.browser.find_by_css('.not-found-card')
+        return self.handle_response()
+    
+    def show_success(self):
+        self.browser.find_by_css('.not-found-card')
+        return self.handle_response()

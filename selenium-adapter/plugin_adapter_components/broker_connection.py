@@ -58,7 +58,7 @@ class BrokerConnection:
 
         # Stop the SUT response handler thread
         if self.adapter_core != None and self.adapter_core.handler != None:
-            self.adapter_core.handler.stop_sut_thread = True
+            self.adapter_core.handler.stop()
 
 
     """
@@ -119,8 +119,8 @@ class BrokerConnection:
     param [Integer] correlation_id
     """
     def send_stimulus(self, pb_label, physical_label, timestamp, correlation_id):
-        self.logger.debug("BrokerConnection", "Sending stimulus confirmation")
-        
+        self.logger.debug("BrokerConnection", "Sending stimulus confirmation: {}".format(pb_label.label))
+
         if physical_label:
             pb_label.physical_label = physical_label
 
