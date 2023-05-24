@@ -115,9 +115,12 @@ class Handler:
     """
     def supported_labels(self):
         return [
+                self.stimulus('fail', {'status': 'integer'}),
+                self.stimulus('success', {'status': 'integer', 'body': 'string'}),
 
-                self.stimulus('not_found', {'status': 'integer'}),
-                self.stimulus('found', {'status': 'integer', 'body': 'string'}),
+                self.response('get_properties'),
+                self.response('get_property'),
+                self.response('post_booking')
         ]
     
     
@@ -134,24 +137,19 @@ class Handler:
         physical_label = None
         label_name = label.label
 
-        # TODO: Implement threading        
-        # new_thread = threading.Thread(target=self.threaded_simulate, args=(label,))
-        # new_thread.start()
-
         if self.sut_connection:
-            if label_name == 'found':
+            if label_name == 'success':
                 self.sut_connection.add_http_response_to_queue(
                     self.get_param_value(label, 'status'),
                     self.get_param_value(label, 'body'))
 
-            elif label_name == 'not_found':
+            elif label_name == 'fail':
                 self.sut_connection.add_http_response_to_queue(
                     self.get_param_value(label, 'status'))
 
             else: 
                 raise Exception(f"Unsupported stimulus {label.label!r}")
    
-
         return physical_label
     
 

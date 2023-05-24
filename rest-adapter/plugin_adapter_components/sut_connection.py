@@ -1,5 +1,5 @@
-import time
 from flask import Flask, request
+from flask_cors import CORS, cross_origin
 import threading
 from queue import Queue
 
@@ -18,26 +18,46 @@ class RestInterface:
         self.flask_thread = None
 
         self.app = Flask(__name__)
+        CORS(self.app)
 
-        @self.app.route('/', defaults={'path': ''})
-        @self.app.route('/<path:path>')
-        def catch_all(path):
-            # get the request method and headers
-            req_method = request.method
-            req_headers = request.headers
+        # @self.app.route('/', defaults={'path': ''})
+        # @self.app.route('/<path:path>', methods=['GET', 'POST'])
+        # def catch_all(path):
+        #     # get the request method and headers
+        #     req_method = request.method
+        #     req_headers = request.headers
 
-            # TODO: parse the request to see if it is checking inventory 
-            self.handle_response("check_inventory")
+        #     # TODO: parse the request to see if it is checking inventory 
+        #     self.handle_response("post_booking")
 
-            # Wait for the 
-            response = json_response_queue.get(timeout=5)
-            print(response)
+        #     # Wait for the response from the queue
+        #     response = json_response_queue.get(timeout=5)
+
+        #     return self.app.response_class(
+        #         status=response[0],
+        #         response=response[1]
+        #     )
+
+        @self.app.route('/properties/<int:id>', methods=['GET'])
+        def handleGetProperty(id):
+            self.handle_response("get_property")
+
+            return waitForResponse()
+        
+        @self.app.route('/booking', methods=['POST'])
+        def handlePostBooking():
+            self.handle_response("post_booking")
+
+            return waitForResponse()
+
+        def waitForResponse():
+            # Wait for the response from the queue which is sent by AMP
+            response = json_response_queue.get(timeout=10)
+        
             return self.app.response_class(
                 status=response[0],
-                response=response[1],
-            )            
-            # return a string with the requested path, method, and headers
-            return f"You want path: {path}\nRequest method: {req_method}\nRequest headers: {req_headers}\n"
+                response=response[1]
+            )
 
     """
     Special function: class name
@@ -63,10 +83,10 @@ class RestInterface:
     Prepares the SUT for a new test case.
     """
     def reset(self):
-        self.logger.info("Sut", "Resetting Selenium browser started")
+        self.logger.info("Sut", "Resetting REST API started")
         self.stop()
         self.start()
-        self.logger.info("Sut", "Resetting Selenium browser completed")
+        self.logger.info("Sut", "Resetting REST API completed")
 
 
 
