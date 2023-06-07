@@ -3,7 +3,8 @@ import time
 from decimal import Decimal
 from threading import Thread
 from datetime import date
-from .client_side.sut import SeleniumSut
+from .sut_connection import SeleniumInterface
+from .adapter_core import AdapterCore
 
 sys.path.insert(0, './api')
 from api.label_pb2 import Label
@@ -24,20 +25,17 @@ Entry = Hash.Entry
 
 
 class Handler:
-    def __init__(self, logger):
-        self.adapter_core = None  # callback to adapter; register separately
+    def __init__(self, logger, channel):
+        self.adapter_core: AdapterCore | None = None # callback to adapter; register separately
         self.configuration = []
 
         # Initialize empty SUT connections
-        self.sut = None
-
-        self.responses = []
-        self.sut_thread = None
-        self.stop_sut_thread = False
+        self.sut: SeleniumInterface | None = None
         self.event_queue = []
 
         # Initialize logger
         self.logger = logger
+        self.channel = channel
 
     """
     Set the adapter core object reference.
@@ -46,28 +44,17 @@ class Handler:
     def register_adapter_core(self, adapter_core):
         self.adapter_core = adapter_core
 
-
-    def running_sut(self, stop):
-        while True:
-            if stop():
-                break
-
-            if self.responses:
-                response = self.responses[0]
-                self.responses.pop(0)
-                self.response_received(response)
-            else:
-                time.sleep(0.1)
-
+ 
     """
     SUT SPECIFIC
 
     The SUT has produced a response which needs to be passed on to AMP.
-    param[[key, type, value]]
+    param[[channel, key, type, value]]
     """
-    def response_received(self, response):
-        self.logger.debug("Handler", "response received: {}".format(response))
-        self.adapter_core.send_response(self.response(response[0], response[1], response[2]),
+    def send_respone(self, label_name, parameters_type={}, parameters_value={}):
+        self.logger.debug("Handler", "response received: {}".format(label_name))
+        if self.adapter_core:
+            self.adapter_core.send_response(self.response(label_name, parameters_type, parameters_value),
             None, time.time_ns())
 
     """
@@ -76,12 +63,10 @@ class Handler:
     Prepare the SUT to start testing.
     """
     def start(self):
-        self.responses = []
-        self.sut = SeleniumSut(self.logger, self.responses, self.event_queue)
+        self.sut = SeleniumInterface(self.logger, self.responses, self.event_queue, self.send_response)
         self.sut.start()
-        self.stop_thread = False
+
         self.stop_event_thread = False
-        self.sut_thread = Thread(target=self.running_sut, args=(lambda: self.stop_sut_thread,))
         self.event_thread = Thread(target=self.running_event, args=(lambda: self.stop_event_thread,))
         self.event_thread.start()
         self.sut_thread.start()
@@ -104,12 +89,18 @@ class Handler:
     def stop(self):
         self.logger.info("Handler", "Stopping the plugin adapter from plugin handler")
 
-        self.sut.stop()
-        self.sut = None
+        # Stop the event thread
+        self.stop_event_thread = True
+        self.event_thread.join()
+        self.event_thread = None
 
-        self.stop_sut_thread = True
-        self.sut_thread.join()
-        self.sut_thread = None
+        # Stop the SUT 
+        if self.sut_connection:
+            self.sut_connection.stop()
+            self.sut_connection = None
+        else:
+            self.logger.debug("Handler", "Sut connection has not yet been initialized")
+
 
         self.logger.debug("Handler", "Finished stopping the plugin adapter from plugin handler")
 
@@ -181,7 +172,7 @@ class Handler:
 
         pb_label = Label(label=label_name,
                                    type=label_type,
-                                   channel="extern",
+                                   channel=self.channel,
                                    parameters=pb_params)
 
         pb_label.timestamp = time.time_ns()
@@ -232,7 +223,7 @@ class Handler:
 
         pb_label = Label(label=label_name,
                                    type=label_type,
-                                   channel="extern",
+                                   channel=self.channel,
                                    parameters=pb_params)
 
         pb_label.timestamp = time.time_ns()
