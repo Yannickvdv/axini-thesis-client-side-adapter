@@ -10,12 +10,12 @@ from plugin_adapter_components.handler import Handler
 """
 Start the plugin adapter to connect with AMP.
 """
-def start_plugin_adapter(name, url, token, log_level, extra_logs):
+def start_plugin_adapter(name, channel, url, token, log_level, extra_logs):
     logger = Logger()
     logger.log_level(log_level & logger.LOG_ALL)
 
     broker_connection = BrokerConnection(url, token, extra_logs, logger)
-    handler = Handler(logger)
+    handler = Handler(logger, channel)
 
     adapter_core = AdapterCore(name, broker_connection, handler, logger)
 
@@ -55,4 +55,4 @@ if __name__ == '__main__':
     if args.extra_logs == None or args.extra_logs != "True":
         extra_logs = False
 
-    start_plugin_adapter(name, args.url, args.token, log_level, extra_logs)
+    start_plugin_adapter(name, args.channel, args.url, args.token, log_level, extra_logs)

@@ -165,7 +165,7 @@ class AdapterCore():
     """
     def send_error(self, message):
         if self.handler != None:
-            self.handler.stop_threads = True
+            self.handler.stop()
 
         self.broker_connection.send_error(message)
         self.broker_connection.close(reason=message)

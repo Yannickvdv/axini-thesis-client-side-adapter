@@ -4,14 +4,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import difflib
 
-class SeleniumSut:
+class SeleniumInterface:
     """
     Constructor
     """
-    def __init__(self, logger, responses, event_queue):
+    def __init__(self, logger, responses, event_queue, response_received):
         self.logger = logger
         self.responses = responses
         self.event_queue = event_queue
+        self.response_received = response_received
         self.browser = None
         self.page_source = ''
 
@@ -22,11 +23,28 @@ class SeleniumSut:
         return "Sut"
 
     """
+    Connects to the SUT and prepares it for testing.
+    """
+    def start(self):
+        self.browser = Browser('firefox')
+        self.logger.info("Sut", "Started Selenium browser")
+
+    """
+    Prepares the SUT for a new test case.
+    """
+    def reset(self):
+        self.logger.info("Sut", "Resetting Selenium browser started")
+        self.stop()
+        self.start()
+        self.logger.info("Sut", "Resetting Selenium browser completed")
+
+    """
     Perform any cleanup if the selenium has stopped
     """
     def stop(self):
-        self.logger.info("Sut", "Selenium has stopped testing the SUT")
-        self.responses = []
+        if self.browser:
+            self.browser.quit()
+        self.logger.info("Sut", "Stopped Selenium browser")
 
     """
     Parse the SUT's response and add it to the response stack from the
@@ -34,7 +52,7 @@ class SeleniumSut:
     """
     def handle_response(self, response):
         self.logger.debug("Sut", "Add response: {}".format(response))
-        self.responses.append(response)
+        self.response_received(response[0], response[1], response[2])
 
 
     def click(self, css_selector):
