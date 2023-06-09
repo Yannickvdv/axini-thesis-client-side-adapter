@@ -134,7 +134,7 @@ class Handler:
                 self.stimulus('visit', {'_url': 'string'}),
                 self.stimulus('fill_in', {'selector': 'string', 'value': 'string'}),
 
-                self.response('page_update', {'added_lines': 'array', 'removed_lines': 'array'}),
+                self.response('page_update', {'elems': 'struct'}),
                 self.response('page_title', {'_title' : 'string', '_url' : 'string'}),
               ]
 
