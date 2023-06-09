@@ -63,7 +63,7 @@ class SeleniumInterface:
 
     def click_link(self, css_selector):
         self.browser.find_by_css(css_selector).first.click()
-        time.sleep(2)
+        time.sleep(3)
         self.generate_response()
 
 
@@ -89,12 +89,11 @@ class SeleniumInterface:
         self.page_source = self.browser.html
         response = [
             "page_title",
-            {"_title": "string", "_url": "string"},
-            {"_title": self.browser.title, "_url": self.browser.url}
+            {"title": "string", "_url": "string"},
+            {"title": self.browser.title, "_url": self.browser.url}
         ]
         self.handle_response(response)
         return
-
 
     def get_updates(self):
 
@@ -113,12 +112,53 @@ class SeleniumInterface:
                 removed_lines.append(line[1:].replace('\t','').replace('\n',''))
 
         if added_lines or removed_lines:
-            print('Added lines:')
-            print(added_lines)
+            added_lines.pop(0)
+            removed_lines.pop(0)
 
-            print('Removed lines:')
-            print(removed_lines)
+            tmp = {}
+            for removed_line, added_line in zip(removed_lines, added_lines):
+                vals = self.get_css_selector(removed_line, added_line)
+                if vals:
+                    tmp.update(vals)
 
-            response = ["page_update", {'added_lines': 'array', 'removed_lines':'array' },{'added_lines': added_lines[1:],'removed_lines':removed_lines[1:]}]
-            self.handle_response(response)
+            if tmp:
+                response = ["page_update", {'elems': 'struct'},{'elems': tmp}]
+                self.handle_response(response)
+
         self.page_source = current_page_source
+
+
+
+
+    def get_css_selector(self, r_line, a_line):
+        # Create a BeautifulSoup object
+        removed_element = BeautifulSoup(r_line, 'html.parser').find(True)
+        added_element = BeautifulSoup(a_line, 'html.parser').find(True)
+
+        css_selector = ""
+        before = ""
+        after = ""
+        tmp = {}
+
+        if removed_element and added_element:
+                    
+            # Build the CSS selector string
+            css_selector_parts = [removed_element.name]
+
+            element_id = removed_element.get('id')
+            if element_id:
+                css_selector_parts.append("#" + element_id)
+
+            element_classes = removed_element.get('class')
+            if element_classes:
+                css_classes = ".".join(element_classes)
+                css_selector_parts.append("." + css_classes)
+
+            css_selector = "".join(css_selector_parts)
+
+            for prop in props:
+#                before = removed_element.get(prop) if removed_element.get(prop) else ''
+                after = added_element.get(prop) if added_element.get(prop) else ''
+                tmp[css_selector] = {prop : after}
+
+        return tmp
