@@ -32,6 +32,7 @@ class Handler:
         # Initialize empty SUT connections
         self.sut: SeleniumInterface | None = None
         self.event_queue = []
+        self.event_thread = None
 
         # Initialize logger
         self.logger = logger
@@ -51,7 +52,7 @@ class Handler:
     The SUT has produced a response which needs to be passed on to AMP.
     param[[channel, key, type, value]]
     """
-    def send_respone(self, label_name, parameters_type={}, parameters_value={}):
+    def send_response(self, label_name, parameters_type={}, parameters_value={}):
         self.logger.debug("Handler", "response received: {}".format(label_name))
         if self.adapter_core:
             self.adapter_core.send_response(self.response(label_name, parameters_type, parameters_value),
@@ -63,13 +64,12 @@ class Handler:
     Prepare the SUT to start testing.
     """
     def start(self):
-        self.sut = SeleniumInterface(self.logger, self.responses, self.event_queue, self.send_response)
+        self.sut = SeleniumInterface(self.logger, self.event_queue, self.send_response)
         self.sut.start()
 
         self.stop_event_thread = False
         self.event_thread = Thread(target=self.running_event, args=(lambda: self.stop_event_thread,))
         self.event_thread.start()
-        self.sut_thread.start()
 
     """
     SUT SPECIFIC
@@ -79,6 +79,9 @@ class Handler:
     """
     def reset(self):
         self.logger.info("Handler", "Resetting the sut for new test cases")
+        self.stop()
+        time.sleep(3)
+        self.start()
         
 
     """
@@ -90,14 +93,15 @@ class Handler:
         self.logger.info("Handler", "Stopping the plugin adapter from plugin handler")
 
         # Stop the event thread
-        self.stop_event_thread = True
-        self.event_thread.join()
-        self.event_thread = None
+        if self.event_thread:
+            self.stop_event_thread = True
+            self.event_thread.join()
+            self.event_thread = None
 
         # Stop the SUT 
-        if self.sut_connection:
-            self.sut_connection.stop()
-            self.sut_connection = None
+        if self.sut:
+            self.sut.stop()
+            self.sut = None
         else:
             self.logger.debug("Handler", "Sut connection has not yet been initialized")
 
@@ -131,11 +135,11 @@ class Handler:
         return [
                 self.stimulus('click', {'selector': 'string'}),
                 self.stimulus('click_link', {'selector': 'string'}),
-                self.stimulus('visit', {'_url': 'string'}),
+                self.stimulus('open_url', {'url': 'string'}),
                 self.stimulus('fill_in', {'selector': 'string', 'value': 'string'}),
 
                 self.response('page_update', {'elems': 'struct'}),
-                self.response('page_title', {'_title' : 'string', '_url' : 'string'}),
+                self.response('page_title', {'title' : 'string', 'url' : 'string'}),
               ]
 
     """
@@ -150,6 +154,28 @@ class Handler:
     def stimulate(self, label):
         self.event_queue.append(label)
 
+    def running_event(self, stop):
+        while True:
+            if stop():
+                break
+
+            if self.event_queue:
+                label = self.event_queue[0]
+                self.event_queue.pop(0)
+                match label.label:
+                    case 'click':
+                        self.sut.click(label.parameters[0].value.string)
+                    case 'open_url':
+                        self.sut.open_url(label.parameters[0].value.string)
+                    case 'fill_in':
+                        self.sut.fill_in(label.parameters[0].value.string, label.parameters[1].value.string)
+                    case 'click_link':
+                        self.sut.click_link(label.parameters[0].value.string)
+                    case _:
+                        self.logger.warning("Handler", f"Unknown label: {label.label}")
+            else:
+                self.sut.get_updates()
+                time.sleep(.1)
 
     """
     TODO ADD ARRAY AND HASH TYPES
@@ -304,30 +330,6 @@ class Handler:
         self.broker_connection.close(reason=message)
 
 
-    def running_event(self, stop):
-        while True:
-            if stop():
-                break
-
-            if self.event_queue:
-                label = self.event_queue[0]
-                self.event_queue.pop(0)
-                match label.label:
-                    case 'click':
-                        self.sut.click(label.parameters[0].value.string)
-                    case 'visit':
-                        self.sut.visit(label.parameters[0].value.string)
-                    case 'fill_in':
-                        self.sut.fill_in(label.parameters[0].value.string, label.parameters[1].value.string)
-                    case 'click_link':
-                        self.sut.click_link(label.parameters[0].value.string)
-                    case _:
-                        self.logger.warning("Handler", f"Unknown label: {label.label}")
-            else:
-                self.sut.get_updates()
-                time.sleep(1)
-
-
     def encodeList(self, source: list) -> Array:
         values = [self.encodeToValue(value) for value in source]
         pb_array = Array()
@@ -363,8 +365,8 @@ class Handler:
                 value.boolean = var
             case date():
                 value.date = var
-            case time():
-                value.time = var
+            # case time():
+                # value.time = var
             case list():
                 value.array.CopyFrom(self.encodeList(var))
             case dict():

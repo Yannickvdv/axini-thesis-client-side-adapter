@@ -3,14 +3,16 @@ from splinter import Browser
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import difflib
+from bs4 import BeautifulSoup
+
+props = ['style']
 
 class SeleniumInterface:
     """
     Constructor
     """
-    def __init__(self, logger, responses, event_queue, response_received):
+    def __init__(self, logger, event_queue, response_received):
         self.logger = logger
-        self.responses = responses
         self.event_queue = event_queue
         self.response_received = response_received
         self.browser = None
@@ -26,7 +28,7 @@ class SeleniumInterface:
     Connects to the SUT and prepares it for testing.
     """
     def start(self):
-        self.browser = Browser('firefox')
+        self.browser = Browser('chrome')
         self.logger.info("Sut", "Started Selenium browser")
 
     """
@@ -35,6 +37,7 @@ class SeleniumInterface:
     def reset(self):
         self.logger.info("Sut", "Resetting Selenium browser started")
         self.stop()
+        time.sleep(3)
         self.start()
         self.logger.info("Sut", "Resetting Selenium browser completed")
 
@@ -67,7 +70,7 @@ class SeleniumInterface:
         self.generate_response()
 
 
-    def visit(self, url):
+    def open_url(self, url):
         self.browser.visit(url)
         self.generate_response()
 
@@ -77,26 +80,18 @@ class SeleniumInterface:
         self.browser.find_by_css(css_selector).fill(value)
 
 
-    # Create a new Browser instance
-    def start(self, headless=True):
-        self.browser = Browser('chrome', headless=headless)
-        self.browser.wait_time = 5
-        #WebDriverWait(self.browser.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'body.loaded')))
-
-
     def generate_response(self):
 
         self.page_source = self.browser.html
         response = [
             "page_title",
-            {"title": "string", "_url": "string"},
-            {"title": self.browser.title, "_url": self.browser.url}
+            {"title": "string", "url": "string"},
+            {"title": self.browser.title, "url": self.browser.url}
         ]
         self.handle_response(response)
         return
 
     def get_updates(self):
-
         if not self.page_source:
             return
         
