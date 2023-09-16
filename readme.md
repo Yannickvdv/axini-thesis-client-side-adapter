@@ -14,8 +14,8 @@ To start the Python adapter; go to the folder python_adapter in your terminal an
 - <channel> is the channel.
 - <loglevel> is the level of the logger shown in the terminal, either 1 (error), 2 (warning), 4 (into) or 8 (debugging).
 - <token> is the token generated on the Adapter page within the AMP GUI.
-- <websocket>  Additionally the websocket address for the adapter (ws(s)://..) can be found on the same page.
+- <websocket>  Additionally, the websocket address for the adapter (ws(s)://..) can be found on the same page.
 
 ### Example
 
-python3 plugin_adapter.py --channel client_side --name selenium --url "wss://research01.axini.com:443/adapters" --log_level 4 --token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2ODk0OTk5OTMsInN1YiI6Inlhbm5pY2sudmFuLmRlci52bGV1dGVuQHN0dWRlbnQudXZhLm5sIiwiaXNzIjoidm1wdWJsaWNwcm9kMDEiLCJzY29wZSI6ImFkYXB0ZXIifQ.Tsrr0qtvVK5shwFzxMgQsndNg_oSXLE22ZV6nOA0adA
+python3 plugin_adapter.py --channel client_side --name presentation_layer --url "wss://research01.axini.com:443/adapters" --log_level 4 --token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MjUwMDc5NTEsInN1YiI6Inlhbm5pY2sudmFuLmRlci52bGV1dGVuQHN0dWRlbnQudXZhLm5sIiwiaXNzIjoidm1wdWJsaWNwcm9kMDEiLCJzY29wZSI6ImFkYXB0ZXIifQ._tw6xCrwhmotNnjgsTWAbT6nHq5G55qt3BUf_derpCE

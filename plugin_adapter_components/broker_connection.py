@@ -144,8 +144,18 @@ class BrokerConnection:
 
         pb_label.timestamp = timestamp
 
+        label = pb_label.SerializeToString()
+        # print(repr(label))
+        # print(self.sizeof(label))        
+
         self.send_message(message_pb2.Message(label=pb_label))
 
+
+    def sizeof(self, obj):
+        size = sys.getsizeof(obj)
+        if isinstance(obj, dict): return size + sum(map(self.sizeof, obj.keys())) + sum(map(self.sizeof, obj.values()))
+        if isinstance(obj, (list, tuple, set, frozenset)): return size + sum(map(self.sizeof, obj))
+        return size
 
     """
     Send an Error message to AMP.

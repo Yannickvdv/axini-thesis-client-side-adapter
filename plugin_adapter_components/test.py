@@ -14,13 +14,20 @@ logger.log_level(4 & logger.LOG_ALL)
 
 sut = SeleniumInterface(logger, [], ())
 sut.start()
-sut.browser.visit('http://localhost:3000')
-
-time.sleep(2)
+sut.driver.visit('http://localhost:3000')
+sut.page_url = sut.driver.url
+print(sut.page_url)
+# sut.browser.visit('http://localhost:3000')
 
 while True:
-    sut.page_source = sut.browser.html
-    print("do it now")
-    time.sleep(5)
+    time.sleep(0.01)
     sut.get_updates()
-    time.sleep(1)
+    
+while True:
+    input("Get source?")
+    sut.page_source = sut.browser.html
+    print("Got source!")
+    
+    input("Get update?")
+    sut.get_updates()
+    print("Got update!")

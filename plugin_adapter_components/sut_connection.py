@@ -1,11 +1,14 @@
+from datetime import datetime
+import threading
 import time
 from splinter import Browser
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import difflib
-from bs4 import BeautifulSoup
+from xmldiff import main
+from lxml import etree
+from io import StringIO 
 
 props = ['style']
+
+f = open("test.txt", "w")
 
 class SeleniumInterface:
     """
@@ -15,8 +18,10 @@ class SeleniumInterface:
         self.logger = logger
         self.event_queue = event_queue
         self.response_received = response_received
-        self.browser = None
+        self.driver = None
         self.page_source = ''
+        self.page_url = ''
+
 
     """
     Special function: class name
@@ -24,12 +29,15 @@ class SeleniumInterface:
     def __name__(self):
         return "Sut"
 
+
     """
     Connects to the SUT and prepares it for testing.
     """
     def start(self):
-        self.browser = Browser('chrome')
+        self.driver = Browser('chrome')
+        self.driver.wait_time = 10
         self.logger.info("Sut", "Started Selenium browser")
+
 
     """
     Prepares the SUT for a new test case.
@@ -41,13 +49,15 @@ class SeleniumInterface:
         self.start()
         self.logger.info("Sut", "Resetting Selenium browser completed")
 
+
     """
     Perform any cleanup if the selenium has stopped
     """
     def stop(self):
-        if self.browser:
-            self.browser.quit()
+        if self.driver:
+            self.driver.quit()
         self.logger.info("Sut", "Stopped Selenium browser")
+
 
     """
     Parse the SUT's response and add it to the response stack from the
@@ -58,102 +68,110 @@ class SeleniumInterface:
         self.response_received(response[0], response[1], response[2])
 
 
+    """
+    Simulates a click on an element specified by the 
+    CSS selector
+    param [String] css_selector
+    """
     def click(self, css_selector):
-        self.page_source = self.browser.html
-        self.browser.find_by_css(css_selector).first.click()
-        time.sleep(3)
+        self.driver.find_by_css(css_selector).is_visible()
+        self.driver.find_by_css(css_selector).click()
 
 
-    def click_link(self, css_selector):
-        self.browser.find_by_css(css_selector).first.click()
-        time.sleep(3)
-        self.generate_response()
-
-
+    """
+    Navigates to the specified URL and generates a response.
+    param [String] url
+    """
     def open_url(self, url):
-        self.browser.visit(url)
-        self.generate_response()
+        self.driver.visit(url)
 
 
+    """
+    Enters the provided value into an input field
+    specified by the CSS selector.
+    param [String] css_selector
+    param [String] value
+    """
     def fill_in(self, css_selector, value):
-        self.page_source = self.browser.html
-        self.browser.find_by_css(css_selector).fill(value)
+        self.driver.find_by_css(css_selector).fill(value)
 
 
+    """
+    Generates a response containing the current page's title and URL.
+    """
     def generate_response(self):
-
-        self.page_source = self.browser.html
+        # Get initial page url
+        self.page_url = self.driver.url
+        # Get initial page source
+        self.page_source = self.driver.html
         response = [
             "page_title",
             {"title": "string", "url": "string"},
-            {"title": self.browser.title, "url": self.browser.url}
+            {"title": self.driver.title, "url": self.driver.url}
         ]
         self.handle_response(response)
         return
 
+
+    """
+    Compares the page source before and after an action, 
+    detects updates, and generates a response.
+    """
     def get_updates(self):
-        if not self.page_source:
+        # if the driver is instantiated, the url is not selenium's default, and the page url has changed 
+        # then dont compare differences but do a route change event instead
+        if self.driver.url != "" and self.driver.url != "data:," and self.page_url != self.driver.url:
+            self.generate_response()
             return
         
-        current_page_source = self.browser.html
-        diff = difflib.unified_diff(self.page_source.splitlines(), current_page_source.splitlines())
-        added_lines = []
-        removed_lines = []
+        # Get the current version of the UI
+        current = self.driver.html
+            
+        # If the current is empty or same as before throw it away
+        if current == "" or self.page_source == "" or current == self.page_source:
+            return
+        
+        previous = self.page_source
+        self.page_source = current
 
-        for line in diff:
-            if line.startswith('+'):
-                added_lines.append(line[1:].replace('\t','').replace('\n',''))
-            elif line.startswith('-'):
-                removed_lines.append(line[1:].replace('\t','').replace('\n',''))
+        # f1 = open("previous", "a")
+        # f1.write("previous: \n")
+        # f1.write(previous)
+        # f1.write("\n")
 
-        if added_lines or removed_lines:
-            added_lines.pop(0)
-            removed_lines.pop(0)
+        # f2 = open("current", "a")
+        # f2.write("current: \n")
+        # f2.write(current)
+        # f2.write("\n")
 
-            tmp = {}
-            for removed_line, added_line in zip(removed_lines, added_lines):
-                vals = self.get_css_selector(removed_line, added_line)
-                if vals:
-                    tmp.update(vals)
-
-            if tmp:
-                response = ["page_update", {'elems': 'struct'},{'elems': tmp}]
-                self.handle_response(response)
-
-        self.page_source = current_page_source
+        # Create a new thread and start it
+        thread = threading.Thread(target=self.compare_dom_changes, args=(previous, current, threading.current_thread()))
+        thread.start()
 
 
+    def compare_dom_changes(self, previous, current, thread_obj):
+        parser = etree.HTMLParser()
 
+        previous = etree.parse(StringIO(previous), parser)
+        current = etree.parse(StringIO(current), parser)
 
-    def get_css_selector(self, r_line, a_line):
-        # Create a BeautifulSoup object
-        removed_element = BeautifulSoup(r_line, 'html.parser').find(True)
-        added_element = BeautifulSoup(a_line, 'html.parser').find(True)
+        results = main.diff_trees(previous, current)
 
-        css_selector = ""
-        before = ""
-        after = ""
-        tmp = {}
+        nodes = {}
+        for result in results:
+            attributes = {}
+            fields = result._fields
+            for field in fields:
+                attributes[field] = str(getattr(result, field))
 
-        if removed_element and added_element:
-                    
-            # Build the CSS selector string
-            css_selector_parts = [removed_element.name]
+            if type(result).__name__ not in ['MoveNode', 'RenameNode']:
+                if type(result).__name__ in nodes:
+                    nodes[type(result).__name__].append(attributes)
+                else:
+                    nodes[type(result).__name__] = [attributes]
 
-            element_id = removed_element.get('id')
-            if element_id:
-                css_selector_parts.append("#" + element_id)
-
-            element_classes = removed_element.get('class')
-            if element_classes:
-                css_classes = ".".join(element_classes)
-                css_selector_parts.append("." + css_classes)
-
-            css_selector = "".join(css_selector_parts)
-
-            for prop in props:
-#                before = removed_element.get(prop) if removed_element.get(prop) else ''
-                after = added_element.get(prop) if added_element.get(prop) else ''
-                tmp[css_selector] = {prop : after}
-
-        return tmp
+        if nodes:
+            response = ["page_update", {'nodes': 'struct'},{'nodes': nodes}]
+            self.handle_response(response)
+        
+        thread_obj.join()

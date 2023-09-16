@@ -38,6 +38,7 @@ class Handler:
         self.logger = logger
         self.channel = channel
 
+
     """
     Set the adapter core object reference.
     param [AdapterCore] adapter_core
@@ -58,6 +59,7 @@ class Handler:
             self.adapter_core.send_response(self.response(label_name, parameters_type, parameters_value),
             None, time.time_ns())
 
+
     """
     SUT SPECIFIC
 
@@ -70,6 +72,7 @@ class Handler:
         self.stop_event_thread = False
         self.event_thread = Thread(target=self.running_event, args=(lambda: self.stop_event_thread,))
         self.event_thread.start()
+
 
     """
     SUT SPECIFIC
@@ -108,12 +111,14 @@ class Handler:
 
         self.logger.debug("Handler", "Finished stopping the plugin adapter from plugin handler")
 
+
     """
     Generate a protobuf Stimulus Label.
     return [label_pb2.Label]
     """
     def stimulus(self, label_name, parameters={}):
         return self.generate_type_label(label_name, 0, parameters)
+
 
     """
     Generate a protobuf Response Label.
@@ -124,6 +129,7 @@ class Handler:
             return self.generate_type_label(label_name, 1, parameters_type)
         else:
             return self.generate_value_label(label_name, 1, parameters_type, parameters_value)
+
 
     """
     SUT SPECIFIC
@@ -137,10 +143,12 @@ class Handler:
                 self.stimulus('click_link', {'selector': 'string'}),
                 self.stimulus('open_url', {'url': 'string'}),
                 self.stimulus('fill_in', {'selector': 'string', 'value': 'string'}),
+                self.stimulus('accept_alert', {'selector': 'string', 'value': 'string'}),
 
-                self.response('page_update', {'elems': 'struct'}),
+                self.response('page_update', {'nodes': 'struct'}),
                 self.response('page_title', {'title' : 'string', 'url' : 'string'}),
               ]
+
 
     """
     SUT SPECIFIC
@@ -153,6 +161,7 @@ class Handler:
     """
     def stimulate(self, label):
         self.event_queue.append(label)
+
 
     def running_event(self, stop):
         while True:
@@ -169,13 +178,12 @@ class Handler:
                         self.sut.open_url(label.parameters[0].value.string)
                     case 'fill_in':
                         self.sut.fill_in(label.parameters[0].value.string, label.parameters[1].value.string)
-                    case 'click_link':
-                        self.sut.click_link(label.parameters[0].value.string)
                     case _:
                         self.logger.warning("Handler", f"Unknown label: {label.label}")
             else:
+                time.sleep(.01)
                 self.sut.get_updates()
-                time.sleep(.1)
+
 
     """
     TODO ADD ARRAY AND HASH TYPES
@@ -256,6 +264,7 @@ class Handler:
 
         return pb_label
 
+
     """
     Instantiate a label type. In case a struct is wanted, define a dictionary
     using the wanted keys with instantiated values.
@@ -293,6 +302,7 @@ class Handler:
             self.logger.warning("Handler", "UNKNOWN TYPE FOR PARAM/STIMULUS in generate type: {}".format(param_type))
 
         return pb_value, value
+
 
     """
     Obtain the value of a parameter from a label.
@@ -342,7 +352,6 @@ class Handler:
         pb_entry.key.string = key
         pb_entry.value.CopyFrom(self.encodeToValue(value))
         return pb_entry
-
 
 
     def encodeDict(self, source: dict) -> Hash:
