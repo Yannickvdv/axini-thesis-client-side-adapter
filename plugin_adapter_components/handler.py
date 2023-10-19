@@ -82,10 +82,8 @@ class Handler:
     """
     def reset(self):
         self.logger.info("Handler", "Resetting the sut for new test cases")
-        self.stop()
-        time.sleep(3)
-        self.start()
-        
+        self.sut.reset()        
+
 
     """
     SUT SPECIFIC
@@ -163,6 +161,9 @@ class Handler:
         self.event_queue.append(label)
 
 
+    """
+    A threadable 
+    """
     def running_event(self, stop):
         while True:
             if stop():
@@ -180,9 +181,19 @@ class Handler:
                         self.sut.fill_in(label.parameters[0].value.string, label.parameters[1].value.string)
                     case _:
                         self.logger.warning("Handler", f"Unknown label: {label.label}")
+
+        while True:
+            if stop():
+                break
+
+            if self.event_queue:
+                label = self.event_queue[0]
+                self.event_queue.pop(0)
+                stimulate(label)
             else:
-                time.sleep(.01)
-                self.sut.get_updates()
+                time.sleep(0.1)
+                self.sut.get_page_update()
+
 
 
     """

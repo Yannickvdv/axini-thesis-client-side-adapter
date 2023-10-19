@@ -1,11 +1,12 @@
+
 from datetime import datetime
 import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
+from splinter import Browser
 import websockets
 import asyncio
 import threading
 import json
+
 
 class SeleniumInterface:
     """
@@ -16,6 +17,7 @@ class SeleniumInterface:
         self.event_queue = event_queue
         self.response_received = response_received
         self.browser = None
+        self.page_url = None
         self.websocket_server = None
         self.websocket_thread = None
 
@@ -31,17 +33,18 @@ class SeleniumInterface:
     Connects to the SUT and prepares it for testing.
     """
     def start(self):
-        self.browser = webdriver.Chrome()
+        self.browser = Browser('chrome')
 
         # Start the WebSocket server in a separate thread
         self.websocket_thread = threading.Thread(target=self.run_websocket_server)
         self.websocket_thread.start()
         self.websocket_thread_close_event = Event_ts()
 
-        # Inject JavaScript code to set up a MutationObserver for every page load
-        mutation_script = open('./plugin_adapter_components/mutation_observer/mutation_observer_script.js', 'r').read()
-        self.browser.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {'source': mutation_script})
+        # # Inject JavaScript code to set up a MutationObserver for every page load
+        script = open('./plugin_adapter_components/mutation_observer/mutation_observer_script.js', 'r').read()
+        self.browser.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {'source': script})
 
+        
         self.browser.wait_time = 10
         self.logger.info("Sut", "Started Selenium browser")
 
@@ -86,8 +89,8 @@ class SeleniumInterface:
     param [String] css_selector
     """
     def click(self, css_selector):
-        self.browser.find_element(By.CSS_SELECTOR, css_selector).is_displayed()
-        self.browser.find_element(By.CSS_SELECTOR, css_selector).click()
+        self.browser.find_by_css(css_selector).is_visible()
+        self.browser.find_by_css(css_selector).click()
 
 
     """
@@ -95,7 +98,7 @@ class SeleniumInterface:
     param [String] url
     """
     def open_url(self, url):
-        self.browser.get(url)
+        self.browser.visit(url)
 
 
     """
@@ -105,12 +108,11 @@ class SeleniumInterface:
     param [String] value
     """
     def fill_in(self, css_selector, value):
-        # self.browser.find_element(By.CSS_SELECTOR, css_selector).send_keys(value)
-        # self.browser.find_element(By.CSS_SELECTOR, css_selector).send_keys(value, u'\ue007') 
-        element = self.browser.find_element(By.CSS_SELECTOR, css_selector)
-        # self.browser.execute_script(f"arguments[0].value = '{value}';", element)
-        self.browser.execute_script(f"arguments[0].setAttribute('value', '{value}');", element)
-        self.browser.execute_script("var event = new Event('input', { bubbles: true }); arguments[0].dispatchEvent(event);", element)
+        input_element = self.browser.find_by_css(css_selector)[0]
+        text_to_input = value
+        input_element.send_keys(text_to_input, u'\ue007') 
+        # self.browser.execute_script(f"arguments[0].value = '{value}';", input_element)
+
 
     def run_websocket_server(self):
         asyncio.run(self.start_websocket_server())
@@ -119,7 +121,6 @@ class SeleniumInterface:
     async def start_websocket_server(self):
         self.websocket_server = await websockets.serve(self.handle_browser_data, "localhost", 8765)
         await asyncio.gather(self.websocket_server.wait_closed(), self.websocket_thread_close_event.wait())
-        self.logger.info("Sut", "Closing websocket")
 
 
     # Define a callback to handle incoming messages from the browser
@@ -136,16 +137,12 @@ class SeleniumInterface:
             elif (message["label"] == "page_updated"):
                 response = [
                     "page_update", 
-                    {"mutations": "struct"},
-                    {
-                        "mutations": {
-                            "characterData": message["characterData"],
-                            "attributes": message["attributes"],
-                            "childList": message["childList"]
-                        }
-                    }
+                    {'mutations': 'array'},
+                    {'mutations': message["mutations"]}
                 ]
+
             self.handle_response(response)
+
 
 class Event_ts(asyncio.Event):
     #TODO: clear() method
