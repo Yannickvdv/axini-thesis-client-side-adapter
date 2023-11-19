@@ -4,27 +4,35 @@ var socket = new WebSocket("ws://localhost:8765");
 var pageHasInitialized = false;
 
 function sendWebsocketMessage(message) {
-    // Send the JSON data to the server or handle it as needed
-    if (socket.readyState === WebSocket.OPEN) {
-        socket.send(message);
-        console.log("Sent mutation data:", message);
-    } else {
-        console.warn("WebSocket not open, unable to send data.");
-    }
+    return new Promise((resolve, reject) => {
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(message);
+            console.log("Sent mutation data:", message);
+            resolve(); // Message sent successfully
+        } else if (socket.readyState === WebSocket.CONNECTING) {
+            // WebSocket is still connecting, wait for it to open
+            socket.addEventListener('open', () => {
+                socket.send(message);
+                console.log("Sent mutation data:", message);
+                resolve(); // Message sent successfully
+            });
+        } else {
+            console.warn("WebSocket not open, unable to send data.");
+            reject("WebSocket not open");
+        }
+    });
 }
 
-function firstPageReload(){
-    var changes = {};
-    changes.label = "page_loaded";
-    changes.title = document.title;
-    changes.url = window.location.href;
-    var jsonChanges = JSON.stringify(changes); 
-    sendWebsocketMessage(jsonChanges);
-}
-
-function routeChange(event) {
-    console.log(event)
-}
+// function sendWebsocketMessage(message) {
+//     // Send the JSON data to the server or handle it as needed
+//     if (socket.readyState === WebSocket.OPEN) {
+//         socket.send(message);
+//         console.log("Sent mutation data:", message);
+//     } else {
+//         console.warn("WebSocket not open, unable to send data.");
+//         socket.send(message);
+//     }
+// }
 
 function pageChanges(mutationsList){
     var changes = {
@@ -35,47 +43,32 @@ function pageChanges(mutationsList){
     };
 
     mutationsList.forEach(function (mutation) {  
-        if (mutation.type === "characterData") {
-            var mutationInfo = {
-                type: "characterData",
-                oldTextContent: mutation.oldValue,
-                newTextContent: mutation.target.textContent,
-                target: {
-                    nodeId: String(mutation.target.id),
-                    nodeName: mutation.target.nodeName,
-                    nodeType: mutation.target.nodeType
-                },
-            }
+        var mutationInfo = {
+            target: {
+                nodeId: mutation.target.id ? String(mutation.target.id) : null,
+                nodeName: mutation.target.nodeName ? mutation.target.nodeName : null,
+                nodeType: mutation.target.nodeType
+            },
+        }
 
-            attrName = mutation.attributeName;
-            mutationInfo.target[attrName] = mutation.target[attrName]
+        if (mutation.type === "characterData") {
+            mutationInfo.oldTextContent = (mutation.oldValue !== undefined) ? String(mutation.oldValue) : null
+            mutationInfo.newTextContent = (mutation.target.textContent !== undefined)  ? String(mutation.target.textContent) : null
+
             changes.characterData.push(mutationInfo)
         }
         else if (mutation.type === "attributes") {
-            var mutationInfo = {
-                type: "attributes",
-                attributeName: mutation.attributeName,
-                oldAttributeValue: String(mutation.oldValue),
-                newAttributeValue: String(mutation.target[mutation.attributeName]),
-                target: {
-                    nodeId: String(mutation.target.id),
-                    nodeName: mutation.target.nodeName,
-                    nodeType: mutation.target.nodeType,
-                },
-            }
+            attrName = mutation.attributeName;
+
+            mutationInfo.attributeName = mutation.attributeName
+            mutationInfo.oldAttributeValue = (mutation.oldValue !== undefined) ? String(mutation.oldValue) : null
+            mutationInfo.newAttributeValue = (mutation.target[attrName] !== undefined) ? String(mutation.target[attrName]) : null
+            
             changes.attributes.push(mutationInfo)
         }
         else if (mutation.type === "childList") {
-            var mutationInfo = {
-                type: "childList",
-                target: {
-                    nodeId: String(mutation.target.id),
-                    nodeName: mutation.target.nodeName,
-                    nodeType: mutation.target.nodeType,
-                },
-                addedNodes: [],
-                removedNodes: [],
-            };
+            mutationInfo.addedNodes = [];
+            mutationInfo.removedNodes = [];
 
             mutation.addedNodes.forEach(function (node) {
                 // Extract relevant information from added nodes
@@ -104,29 +97,34 @@ function pageChanges(mutationsList){
     // Convert the extracted data to JSON
     var jsonChanges = JSON.stringify(changes);
     sendWebsocketMessage(jsonChanges)
+    .then(() => {
+        console.log("Message sent");
+    })
+    .catch(error => {
+        console.error("Failed to send message:", error);
+    });
+
 }
 
 // Create a WebSocket connection to the Python server
 function mutationCallback(mutationsList, observer) {
-    if (!pageHasInitialized) {
-        firstPageReload();
-        pageHasInitialized = true;
-        return;
-    }
+    // if (!pageHasInitialized) {
+    //     firstPageReload();
+    //     pageHasInitialized = true;
+    //     return;
+    // }
 
     pageChanges(mutationsList);
 }
 
 // Use requestAnimationFrame to ensure the DOM is ready
-requestAnimationFrame(function() {
-
+// requestAnimationFrame(function() {
     // Wait for the DOMContentLoaded event before running your code
     document.addEventListener('DOMContentLoaded', function() {
         // Create a MutationObserver and start observing the DOM
         var observer = new MutationObserver(mutationCallback);
 
         observer.observe(document.documentElement, { attributes: true, childList: true, characterData: true, subtree: true, attributeOldValue: true, characterDataOldValue: true});
-    });
-    
-});
+    }); 
+// });
 

@@ -140,11 +140,12 @@ class Handler:
                 self.stimulus('click', {'selector': 'string'}),
                 self.stimulus('click_link', {'selector': 'string'}),
                 self.stimulus('open_url', {'url': 'string'}),
+                self.stimulus('refresh'),
                 self.stimulus('fill_in', {'selector': 'string', 'value': 'string'}),
-                self.stimulus('accept_alert', {'selector': 'string', 'value': 'string'}),
+                self.stimulus('accept_alert'),
 
                 self.response('page_update', {'nodes': 'struct'}),
-                self.response('page_title', {'title' : 'string', 'url' : 'string'}),
+                # self.response('page_title', {'title' : 'string', 'url' : 'string'}),
               ]
 
 
@@ -177,24 +178,14 @@ class Handler:
                         self.sut.click(label.parameters[0].value.string)
                     case 'open_url':
                         self.sut.open_url(label.parameters[0].value.string)
+                    case 'refresh':
+                        self.sut.refresh()
                     case 'fill_in':
                         self.sut.fill_in(label.parameters[0].value.string, label.parameters[1].value.string)
+                    case 'accept_alert':
+                        self.sut.accept_alert()
                     case _:
                         self.logger.warning("Handler", f"Unknown label: {label.label}")
-
-        while True:
-            if stop():
-                break
-
-            if self.event_queue:
-                label = self.event_queue[0]
-                self.event_queue.pop(0)
-                stimulate(label)
-            else:
-                time.sleep(0.1)
-                self.sut.get_page_update()
-
-
 
     """
     TODO ADD ARRAY AND HASH TYPES
