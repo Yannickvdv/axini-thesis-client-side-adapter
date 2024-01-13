@@ -1,27 +1,25 @@
-from datetime import datetime
-import time
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
+from . import coverage
+import time
 import asyncio
-import threading
 import json
+import threading
 import websockets
-import os
 
 class SeleniumInterface:
     """
     Constructor
     """
-    def __init__(self, logger, event_queue, response_received):
+    def __init__(self, logger, event_queue, response_received, measure_coverage):
         self.logger = logger
         self.event_queue = event_queue
         self.response_received = response_received
+        self.measure_coverage = measure_coverage
         self.browser = None
         self.websocket_server = None
         self.websocket_thread = None
-        self.coverage_folder = self.get_coverage_folder()
-
 
     """
     Special function: class name
@@ -61,48 +59,14 @@ class SeleniumInterface:
         self.logger.info("Sut", "Resetting Selenium browser completed")
 
 
-    def create_coverage(self):
-        coverage_data = self.browser.execute_script('return window.__coverage__;')
-
-        if coverage_data:
-            print('test')
-            json_data = json.dumps(coverage_data)
-            timestamp = int(time.time())
-            coverage_folder = self.coverage_folder
-            file_name = f"{coverage_folder}/coverage_{timestamp}.json"
-            file = open(file_name, "w")
-            file.write(json_data)
-
-
-    def get_coverage_folder(self):
-        base_path = 'plugin_adapter_components/coverage_reports'
-        # List all subdirectories in the base path
-        subdirectories = [d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))]
-
-        if not subdirectories:
-            # If there are no existing folders, create the first one
-            new_folder_name = "1"
-        else:
-            # Find the highest folder number and increment it
-            number_directories = [int(d) for d in subdirectories if d.isdigit()]
-            max_folder_number = max(number_directories) if len(number_directories) > 0 else 0 
-            # max_folder_number = max([int(d) for d in subdirectories if d.isdigit()])
-            new_folder_name = str(max_folder_number + 1)
-
-        new_folder_path = os.path.join(base_path, new_folder_name)
-
-        # Create the new folder
-        os.mkdir(new_folder_path)
-
-        return new_folder_path
-
     """
     Perform any cleanup if the selenium has stopped
     """
     def stop(self):
-        self.create_coverage()
-        # while True:
-        #     time.sleep(20)
+        if self.measure_coverage:
+            coverage_data = self.browser.execute_script('return window.__coverage__;')
+            if coverage_data:
+                coverage.write_coverage(coverage_data)
 
         if self.browser:
             self.browser.quit()
@@ -129,8 +93,10 @@ class SeleniumInterface:
     param [String] css_selector
     """
     def click(self, css_selector):
-        self.browser.find_element(By.CSS_SELECTOR, css_selector).is_displayed()
-        self.browser.find_element(By.CSS_SELECTOR, css_selector).click()
+        element = self.browser.find_element(By.CSS_SELECTOR, css_selector)
+        element.is_displayed()
+        self.browser.execute_script("arguments[0].scrollIntoView(true);", element)
+        element.click()
 
 
     """
@@ -160,9 +126,15 @@ class SeleniumInterface:
         self.browser.execute_script("var event = new Event('input', { bubbles: true }); arguments[0].dispatchEvent(event);", element)
 
 
+    """
+    Accept an alert
+    """
     def accept_alert(self):
         self.browser.switch_to.alert.accept()
 
+    """
+    Run websocket server
+    """
     def run_websocket_server(self):
         asyncio.run(self.start_websocket_server())
 
