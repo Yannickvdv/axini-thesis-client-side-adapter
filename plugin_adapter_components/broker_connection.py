@@ -76,7 +76,6 @@ class BrokerConnection:
     param [String] err
     """
     def on_error(self, ws, err):
-        print(err)
         self.logger.error("BrokerConnection", "Got a connection error: {}".format(str(err)))
         self.adapter_core.send_error(str(err))
 

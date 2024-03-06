@@ -25,7 +25,7 @@ Entry = Hash.Entry
 
 
 class Handler:
-    def __init__(self, logger, channel):
+    def __init__(self, logger, channel, measure_coverage):
         self.adapter_core: AdapterCore | None = None # callback to adapter; register separately
         self.configuration = []
 
@@ -37,6 +37,7 @@ class Handler:
         # Initialize logger
         self.logger = logger
         self.channel = channel
+        self.measure_coverage = measure_coverage
 
 
     """
@@ -66,7 +67,7 @@ class Handler:
     Prepare the SUT to start testing.
     """
     def start(self):
-        self.sut = SeleniumInterface(self.logger, self.event_queue, self.send_response)
+        self.sut = SeleniumInterface(self.logger, self.event_queue, self.send_response, self.measure_coverage)
         self.sut.start()
 
         self.stop_event_thread = False
@@ -82,10 +83,8 @@ class Handler:
     """
     def reset(self):
         self.logger.info("Handler", "Resetting the sut for new test cases")
-        self.stop()
-        time.sleep(3)
-        self.start()
-        
+        self.sut.reset()        
+
 
     """
     SUT SPECIFIC
@@ -140,13 +139,12 @@ class Handler:
     def supported_labels(self):
         return [
                 self.stimulus('click', {'selector': 'string'}),
-                self.stimulus('click_link', {'selector': 'string'}),
-                self.stimulus('open_url', {'url': 'string'}),
                 self.stimulus('fill_in', {'selector': 'string', 'value': 'string'}),
-                self.stimulus('accept_alert', {'selector': 'string', 'value': 'string'}),
+                self.stimulus('open_url', {'url': 'string'}),
+                self.stimulus('refresh'),
+                self.stimulus('accept_alert'),
 
-                self.response('page_update', {'nodes': 'struct'}),
-                self.response('page_title', {'title' : 'string', 'url' : 'string'}),
+                self.response('page_update', {'mutations': 'struct'}),
               ]
 
 
@@ -163,6 +161,9 @@ class Handler:
         self.event_queue.append(label)
 
 
+    """
+    A threadable function to allow for simultaneous stimuli and responses
+    """
     def running_event(self, stop):
         while True:
             if stop():
@@ -176,14 +177,14 @@ class Handler:
                         self.sut.click(label.parameters[0].value.string)
                     case 'open_url':
                         self.sut.open_url(label.parameters[0].value.string)
+                    case 'refresh':
+                        self.sut.refresh()
                     case 'fill_in':
                         self.sut.fill_in(label.parameters[0].value.string, label.parameters[1].value.string)
+                    case 'accept_alert':
+                        self.sut.accept_alert()
                     case _:
                         self.logger.warning("Handler", f"Unknown label: {label.label}")
-            else:
-                time.sleep(.01)
-                self.sut.get_updates()
-
 
     """
     TODO ADD ARRAY AND HASH TYPES

@@ -10,12 +10,12 @@ from plugin_adapter_components.handler import Handler
 """
 Start the plugin adapter to connect with AMP.
 """
-def start_plugin_adapter(name, channel, url, token, log_level, extra_logs):
+def start_plugin_adapter(name, channel, url, token, log_level, extra_logs, measure_coverage):
     logger = Logger()
     logger.log_level(log_level & logger.LOG_ALL)
 
     broker_connection = BrokerConnection(url, token, extra_logs, logger)
-    handler = Handler(logger, channel)
+    handler = Handler(logger, channel, measure_coverage)
 
     adapter_core = AdapterCore(name, broker_connection, handler, logger)
 
@@ -40,6 +40,8 @@ if __name__ == '__main__':
         help='AMP Adapter logger level: 1 = error, 2 = warning, 4 = info, 8 = debug or 15 = all', required=False)
     parser.add_argument('-el','--extra_logs',
         help='Show extra logs related to the socket: True', required=False)
+    parser.add_argument('-co','--measure_coverage',
+        help='Retrieve the measured coverage of a sut: True', required=False)
 
     args = parser.parse_args()
 
@@ -54,5 +56,7 @@ if __name__ == '__main__':
     extra_logs = args.extra_logs
     if args.extra_logs == None or args.extra_logs != "True":
         extra_logs = False
+    if args.measure_coverage == None or args.measure_coverage != "True":
+        measure_coverage = False
 
-    start_plugin_adapter(name, args.channel, args.url, args.token, log_level, extra_logs)
+    start_plugin_adapter(name, args.channel, args.url, args.token, log_level, extra_logs, measure_coverage)

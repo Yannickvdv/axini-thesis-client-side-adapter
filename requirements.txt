@@ -4,3 +4,4 @@ selenium
 splinter
 xmldiff
 lxml
+websockets

@@ -18,4 +18,4 @@ To start the Python adapter; go to the folder python_adapter in your terminal an
 
 ### Example
 
-python3 plugin_adapter.py --channel client_side --name presentation_layer --url "wss://research01.axini.com:443/adapters" --log_level 4 --token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MjUwMDc5NTEsInN1YiI6Inlhbm5pY2sudmFuLmRlci52bGV1dGVuQHN0dWRlbnQudXZhLm5sIiwiaXNzIjoidm1wdWJsaWNwcm9kMDEiLCJzY29wZSI6ImFkYXB0ZXIifQ._tw6xCrwhmotNnjgsTWAbT6nHq5G55qt3BUf_derpCE
+python3 plugin_adapter.py --channel client_side --name presentation_layer --url "wss://research01.axini.com:443/adapters" --log_level 4 --token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MzY3Mjc1NzYsInN1YiI6Inlhbm5pY2sudmFuLmRlci52bGV1dGVuQHN0dWRlbnQudXZhLm5sIiwiaXNzIjoidm1wdWJsaWNwcm9kMDEiLCJzY29wZSI6ImFkYXB0ZXIifQ.1cixD0bPvyonvMioq6TCsBdnhbHGWmviAnza-J2Q2UE
