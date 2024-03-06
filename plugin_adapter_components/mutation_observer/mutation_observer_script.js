@@ -23,17 +23,6 @@ function sendWebsocketMessage(message) {
     });
 }
 
-// function sendWebsocketMessage(message) {
-//     // Send the JSON data to the server or handle it as needed
-//     if (socket.readyState === WebSocket.OPEN) {
-//         socket.send(message);
-//         console.log("Sent mutation data:", message);
-//     } else {
-//         console.warn("WebSocket not open, unable to send data.");
-//         socket.send(message);
-//     }
-// }
-
 function pageChanges(mutationsList){
     var changes = {
         label: "page_updated",
@@ -108,23 +97,14 @@ function pageChanges(mutationsList){
 
 // Create a WebSocket connection to the Python server
 function mutationCallback(mutationsList, observer) {
-    // if (!pageHasInitialized) {
-    //     firstPageReload();
-    //     pageHasInitialized = true;
-    //     return;
-    // }
-
     pageChanges(mutationsList);
 }
 
-// Use requestAnimationFrame to ensure the DOM is ready
-// requestAnimationFrame(function() {
-    // Wait for the DOMContentLoaded event before running your code
-    document.addEventListener('DOMContentLoaded', function() {
-        // Create a MutationObserver and start observing the DOM
-        var observer = new MutationObserver(mutationCallback);
+// Wait for the DOMContentLoaded event before running 
+document.addEventListener('DOMContentLoaded', function() {
+    // Create a MutationObserver and start observing the DOM
+    var observer = new MutationObserver(mutationCallback);
 
-        observer.observe(document.documentElement, { attributes: true, childList: true, characterData: true, subtree: true, attributeOldValue: true, characterDataOldValue: true});
-    }); 
-// });
+    observer.observe(document.documentElement, { attributes: true, childList: true, characterData: true, subtree: true, attributeOldValue: true, characterDataOldValue: true});
+}); 
 
